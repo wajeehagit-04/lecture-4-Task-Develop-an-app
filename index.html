@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CT Dose Index & DLP Estimator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            width: 100%;
+            max-width: 450px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+
+        .header {
+            background-color: #1e3a8a;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            font-style: italic;
+            color: #9ca3af;
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        .form-container {
+            padding: 25px 20px 15px 20px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            width: 55%;
+            font-size: 14px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .input-group input, .input-group select {
+            width: 45%;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background-color: #fff;
+            outline: none;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            border-color: #0d9488;
+        }
+
+        .btn-container {
+            text-align: center;
+            padding: 10px 20px;
+        }
+
+        .btn-calculate {
+            background-color: #0d9488;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        .btn-calculate:hover {
+            background-color: #0f766e;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 15px 20px;
+        }
+
+        .results-container {
+            padding: 15px 20px;
+        }
+
+        .result-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .result-label {
+            width: 55%;
+            font-size: 14px;
+            color: #4b5563;
+        }
+
+        .result-value {
+            width: 45%;
+            font-weight: bold;
+            color: #9ca3af;
+        }
+
+        #dlp_result.calculated {
+            color: #1e3a8a;
+            font-size: 16px;
+        }
+
+        #ed_result.calculated {
+            color: #0d9488;
+            font-size: 18px;
+        }
+
+        .footer {
+            padding: 15px 20px 25px 20px;
+            font-size: 11px;
+            color: #9ca3af;
+            text-align: center;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>CT Dose & Risk Estimator</h1>
+    </div>
+    <div class="subtitle">Medical Physics Department Tool</div>
+
+    <div class="form-container">
+        <div class="input-group">
+            <label for="ctdi">CTDIvol (mGy):</label>
+            <input type="number" id="ctdi" step="any" placeholder="0.0">
+        </div>
+        <div class="input-group">
+            <label for="length">Scan Length (cm):</label>
+            <input type="number" id="length" step="any" placeholder="0.0">
+        </div>
+        <div class="input-group">
+            <label for="region">Scan Region:</label>
+            <select id="region">
+                <option value="Head">Head</option>
+                <option value="Chest" selected>Chest</option>
+                <option value="Abdomen/Pelvis">Abdomen/Pelvis</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="btn-container">
+        <button class="btn-calculate" onclick="calculateDose()">Calculate Patient Dose</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="results-container">
+        <div class="result-row">
+            <div class="result-label">Dose Length Product (DLP):</div>
+            <div class="result-value" id="dlp_result">-- mGy·cm</div>
+        </div>
+        <div class="result-row">
+            <div class="result-label">Estimated Effective Dose:</div>
+            <div class="result-value" id="ed_result">-- mSv</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Disclaimer: This software is an educational prototype mapping ICRP conversion coefficients. It is not a calibrated tool for direct clinical diagnostics or formal safety logs.
+    </div>
+</div>
+
+<script>
+    function calculateDose() {
+        const ctdiInput = document.getElementById('ctdi').value;
+        const lengthInput = document.getElementById('length').value;
+        const region = document.getElementById('region').value;
+
+        const ctdiVol = parseFloat(ctdiInput);
+        const scanLength = parseFloat(lengthInput);
+
+        if (isNaN(ctdiVol) || isNaN(scanLength)) {
+            alert("Input Error: Please enter valid numerical values for CTDIvol and Scan Length.");
+            return;
+        }
+
+        // 2. Basic CT Physics Formula: DLP = CTDIvol * Scan Length
+        const dlp = ctdiVol * scanLength;
+
+        // 3. Define Standard ICRP k-factors
+        const kFactors = {
+            "Head": 0.0021,
+            "Chest": 0.0140,
+            "Abdomen/Pelvis": 0.0150
+        };
+
+        const kFactor = kFactors[region];
+
+        // 4. Advanced Physics Formula: Effective Dose = DLP * k-factor
+        const effectiveDose = dlp * kFactor;
+
+        // 5. Update UI
+        const dlpResult = document.getElementById('dlp_result');
+        const edResult = document.getElementById('ed_result');
+
+        dlpResult.textContent = dlp.toFixed(2) + " mGy·cm";
+        dlpResult.classList.add('calculated');
+
+        edResult.textContent = effectiveDose.toFixed(3) + " mSv";
+        edResult.classList.add('calculated');
+    }
+</script>
+
+</body>
+</html>
